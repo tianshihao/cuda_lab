@@ -1,12 +1,13 @@
 CompileFlags:
-  Add: 
-    - -x
-    - cuda
-    - -std=c++17
-    - -I/usr/local/cuda/include
-    - -L/usr/local/cuda/lib64
-    # - cuda-gpu-arch=sm_86
-    <!-- - -I/path/to/your/cpp/includes -->
+  Add:
+    - --cuda-path=/usr/local/cuda-11.6
+    - -L/usr/local/cuda-11.6/lib64
+    - -I/usr/local/cuda-11.6/include
+    - --cuda-gpu-arch=sm_86
+  Remove:
+    - -forward-unknown-to-host-compiler
+    - --generate-code=arch=compute_86,code=[compute_86,sm_86]
+    - --options-file
 
 # Use the Google style guide
-Style: Google
+# Style: Google

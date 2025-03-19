@@ -5,9 +5,6 @@ project(hello_cuda LANGUAGES CXX CUDA)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-# Specify the CUDA architecture for RTX 3080
-set(CMAKE_CUDA_ARCHITECTURES 86)
-
 # Find packages
 find_package(CUDAToolkit REQUIRED)
 
