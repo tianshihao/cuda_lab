@@ -20,8 +20,9 @@ int main() {
   cuda_lab::matrix_multiply::PrintMatrix(
       h_b.data(), A_cols, B_cols, cuda_lab::matrix_multiply::TILE_DIM, "B");
 
-  cuda_lab::matrix_multiply::MatrixMultiply(h_a.data(), h_b.data(), h_c.data(),
-                                            A_rows, A_cols, B_cols);
+  cuda_lab::matrix_multiply::MatrixMultiply(
+      h_a.data(), h_b.data(), h_c.data(), A_rows, A_cols, B_cols,
+      cuda_lab::matrix_multiply::MatrixMultiplyType::kCoalesced);
 
   cuda_lab::matrix_multiply::PrintMatrix(
       h_c.data(), A_rows, B_cols, cuda_lab::matrix_multiply::TILE_DIM, "C");
