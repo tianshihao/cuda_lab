@@ -7,6 +7,27 @@
 
 namespace cuda_lab::matrix_multiply {
 
+__global__ void CoalescedMultiply(float* a, float* b, float* c, int A_rows,
+                                  int A_cols, int B_cols) {
+  // Share memory on chip
+  __shared__ float a_tile[TILE_DIM][TILE_DIM];
+
+  auto row{blockIdx.y * blockDim.y + threadIdx.y};
+  auto col{blockIdx.x * blockDim.x + threadIdx.x};
+  auto sum{0.0f};
+
+  // Cache all rows in the block.
+  a_tile[threadIdx.y][threadIdx.x] = a[row * A_cols + threadIdx.x];
+
+  __syncwarp();
+
+  // i to iterate over the columns of A and rows of B.
+  for (int i{0}; i < A_cols; i++) {
+    sum += a_tile[threadIdx.y][i] * b[i * B_cols + col];
+  }
+  c[row * B_cols + col] = sum;
+}
+
 __global__ void SimpleMultiply(float* a, float* b, float* c, int A_rows,
                                int A_cols, int B_cols) {
   auto row{blockIdx.y * blockDim.y + threadIdx.y};
@@ -33,7 +54,7 @@ __global__ void SimpleMultiply(float* a, float* b, float* c, int A_rows,
 }
 
 void MatrixMultiply(float* h_a, float* h_b, float* h_c, int A_rows, int A_cols,
-                    int B_cols) {
+                    int B_cols, MatrixMultiplyType type) {
   float *d_a{nullptr}, *d_b{nullptr}, *d_c{nullptr};
 
   // Allocate device memory
@@ -69,8 +90,22 @@ void MatrixMultiply(float* h_a, float* h_b, float* h_c, int A_rows, int A_cols,
             << std::endl;
 
   // Calling the kernel
-  SimpleMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c, A_rows, A_cols,
-                                            B_cols);
+  switch (type) {
+    case MatrixMultiplyType::kSimple:
+      SimpleMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c, A_rows, A_cols,
+                                                B_cols);
+      break;
+
+    case MatrixMultiplyType::kCoalesced:
+      CoalescedMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c, A_rows,
+                                                   A_cols, B_cols);
+      break;
+
+    default:
+      break;
+  }
+  // SimpleMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c, A_rows, A_cols,
+  //                                           B_cols);
 
   cudaStreamSynchronize(0);  // Wait for the kernel to finish
   // Check for kernel errors
