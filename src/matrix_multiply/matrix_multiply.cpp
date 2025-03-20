@@ -2,6 +2,7 @@
 
 #include <cuda_runtime.h>
 
+#include <cstddef>
 #include <cstdlib>
 #include <iostream>
 
@@ -14,11 +15,12 @@ void CheckCudaError(cudaError_t const err, char const* msg) {
   }
 }
 
-void PrintMatrix(const float* matrix, int rows, int cols, int tile_size,
-                 const char* name) {
+void PrintMatrix(const float* const matrix, std::size_t const rows,
+                 std::size_t const cols, std::size_t const tile_size,
+                 const char* const name) {
   std::cout << "Matrix " << name << " (partial):" << std::endl;
-  for (int i = 0; i < tile_size && i < rows; ++i) {
-    for (int j = 0; j < tile_size && j < cols; ++j) {
+  for (std::size_t i{0}; i < tile_size && i < rows; ++i) {
+    for (std::size_t j{0}; j < tile_size && j < cols; ++j) {
       std::cout << matrix[i * cols + j] << " ";
     }
     std::cout << std::endl;
