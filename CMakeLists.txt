@@ -7,14 +7,26 @@ cmake_minimum_required(VERSION 3.18)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Project name and C++ standard
-project(cuda_image_lab LANGUAGES CXX)
+project(cuda_image_lab LANGUAGES C CXX CUDA)
 
-# Specify the CUDA architecture for RTX 3080
-set(CMAKE_CUDA_ARCHITECTURES 86)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
+set(CMAKE_CUDA_ARCHITECTURES 50 52 60 61 70 72 75 80 86)
+
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wno-deprecated-gpu-targets")
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G")  # enable cuda-gdb (expensive)
+endif()
+
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --extended-lambda")
 
 # Find packages
 find_package(OpenCV REQUIRED)
