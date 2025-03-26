@@ -7,27 +7,6 @@
 #include "matrix.h"
 #include "matrix_multiply.h"
 
-// void SetMatrix2(cuda_lab::matrix_multiply::MatrixF &h_a,
-//                 cuda_lab::matrix_multiply::MatrixF &h_b,
-//                 cuda_lab::matrix_multiply::MatrixF &h_c) {
-//   constexpr std::size_t a_rows{16000};
-//   constexpr std::size_t a_cols{cuda_lab::matrix_multiply::BLOCK_SIZE};
-//   constexpr std::size_t b_rows{a_cols};
-//   constexpr std::size_t b_cols{19200};
-
-//   h_a = cuda_lab::matrix_multiply::MatrixF(a_rows, a_cols, a_cols);
-//   h_b = cuda_lab::matrix_multiply::MatrixF(b_rows, b_cols, b_cols);
-//   h_c = cuda_lab::matrix_multiply::MatrixF(a_rows, b_cols, b_cols);
-
-//   std::vector<float> h_data_a(a_rows * a_cols, 1.0f);
-//   std::vector<float> h_data_b(b_rows * b_cols, 2.0f);
-
-//   std::copy(h_data_a.begin(), h_data_a.end(), h_a.elements.get());
-//   std::copy(h_data_b.begin(), h_data_b.end(), h_b.elements.get());
-
-//   std::fill_n(h_c.elements.get(), h_c.height * h_c.width, 0.0f);
-// }
-
 void Test1() {
   cuda_lab::matrix_multiply::Matrix a;
   a.height = 2;
@@ -73,8 +52,8 @@ void Test2() {
 
   cuda_lab::matrix_multiply::Matrix b;
   b.height = cuda_lab::matrix_multiply::kBlockSize;
-  b.width = 1920;
-  b.stride = 1920;
+  b.width = 192000;
+  b.stride = 192000;
   b.elements = new float[b.height * b.stride];
   std::vector<float> h_data_b(b.height * b.stride, 2.0f);
   std::copy(h_data_b.begin(), h_data_b.end(), b.elements);
@@ -96,8 +75,8 @@ void Test2() {
 }
 
 int main() {
-  Test1();
-  //   Test2();
+  // Test1();
+  Test2();
 
   return 0;
 }
