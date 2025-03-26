@@ -31,7 +31,8 @@ void PrintMatrix(Matrix const& m, std::string const& n);
 /// @example
 ///   DivUp(7, 3) = 3;  // 7/3=2.333 → ceil to 3
 ///   DivUp(8, 4) = 2;  // 8/4=2 → exact division
-inline std::size_t DivUp(std::size_t const a, std::size_t const b) {
+__host__ __device__ inline std::size_t DivUp(std::size_t const a,
+                                             std::size_t const b) {
   return (a + b - 1) / b;
 }
 // More, matrix multiply using cpu serial and cpu parallel.

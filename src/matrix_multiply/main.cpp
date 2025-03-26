@@ -57,14 +57,14 @@ void Test1() {
   std::fill_n(c.elements, c.height * c.stride, 0.0f);
 
   cuda_lab::matrix_multiply::MatrixMultiply(
-      a, b, c, cuda_lab::matrix_multiply::MatrixMultiplyType::kCoalesced);
+      a, b, c, cuda_lab::matrix_multiply::MatrixMultiplyType::kSharedAB);
 
   cuda_lab::matrix_multiply::PrintMatrix(c, "C");
 }
 
 void Test2() {
   cuda_lab::matrix_multiply::Matrix a;
-  a.height = 16000;
+  a.height = 1600;
   a.width = cuda_lab::matrix_multiply::kBlockSize;
   a.stride = cuda_lab::matrix_multiply::kBlockSize;
   a.elements = new float[a.height * a.stride];
@@ -73,8 +73,8 @@ void Test2() {
 
   cuda_lab::matrix_multiply::Matrix b;
   b.height = cuda_lab::matrix_multiply::kBlockSize;
-  b.width = 19200;
-  b.stride = 19200;
+  b.width = 1920;
+  b.stride = 1920;
   b.elements = new float[b.height * b.stride];
   std::vector<float> h_data_b(b.height * b.stride, 2.0f);
   std::copy(h_data_b.begin(), h_data_b.end(), b.elements);
@@ -97,7 +97,7 @@ void Test2() {
 
 int main() {
   Test1();
-//   Test2();
+  //   Test2();
 
   return 0;
 }
