@@ -3,49 +3,108 @@
 #include <cstdlib>
 #include <iostream>
 
+#include "matrix.h"
 #include "matrix_multiply.h"
 
 namespace cuda_lab::matrix_multiply {
 
-__global__ void CoalescedMultiply(float const* const a, float const* const b,
-                                  float* const c, std::size_t const a_rows,
-                                  std::size_t const a_cols,
-                                  std::size_t const b_cols) {
+__device__ float GetElement(Matrix const m, std::size_t const row,
+                            std::size_t const col) {
+  // return m.elements[row * m.stride + col];
+  return m.elements[row * m.stride + col];
+}
+
+__device__ float SetElement(Matrix const m, std::size_t const row,
+                            std::size_t const col, float value) {
+  m.elements[row * m.stride + col] = value;
+}
+
+__device__ Matrix GetSubMatrix(Matrix const m, std::size_t const row,
+                               std::size_t const col) {
+  Matrix a_sub;
+  a_sub.height = kBlockSize;
+  a_sub.width = kBlockSize;
+  a_sub.stride = m.stride;
+  a_sub.elements = &m.elements[m.stride * kBlockSize * row + kBlockSize * col];
+
+  return a_sub;
+}
+// __global__ void SharedABMultiply(Matrix const a, Matrix const b, Matrix c) {
+//   auto block_row{blockIdx.x};
+//   auto block_col{blockIdx.y};
+
+//   // Each thread block computes one sub-matrix of c
+//   auto c_sub{GetSubMatrix(c, block_row, block_col)};
+
+//   // Each thread computes one element of c_sub by accumulating results into
+//   // c_value
+//   auto c_value{0.0f};
+
+//   // Thread row and within the c_sub
+//   auto row{threadIdx.y};
+//   auto col{threadIdx.x};
+
+//   for (std::size_t m{0}; m < a.width / BLOCK_SIZE; ++m) {
+//     auto a_sub{GetSubMatrix(a, block_row, m)};
+//     auto b_sub{GetSubMatrix(b, m, block_col)};
+
+//     __shared__ float a_tile[BLOCK_SIZE]
+//                            [BLOCK_SIZE];  // Shared memory for a sub-matrix
+//     __shared__ float b_tile[BLOCK_SIZE]
+//                            [BLOCK_SIZE];  // Shared memory for b sub-matrix
+
+//     a_tile[row][col] = GetElement(a_sub, row, col);
+//     b_tile[row][col] = GetElement(b_sub, row, col);
+
+//     __syncthreads();  // Synchronize to make sure the tile is loaded
+
+//     for (std::size_t e{0}; e < BLOCK_SIZE; ++e) {
+//       c_value += a_tile[row][e] * b_tile[e][col];
+//     }
+
+//     __syncthreads();  // Synchronize to make sure the tile is loaded
+//   }
+
+//   SetElement(c_sub, row, col, c_value);  // Write the result to c
+// }
+
+__global__ void CoalescedMultiply(Matrix const a, Matrix const b, Matrix c) {
   // Share memory on chip
-  __shared__ float a_tile[TILE_DIM][TILE_DIM];
+  __shared__ float a_tile[kBlockSize][kBlockSize];
 
   auto row{blockIdx.y * blockDim.y + threadIdx.y};
   auto col{blockIdx.x * blockDim.x + threadIdx.x};
 
-  if (row >= a_rows || col >= b_cols) {
+  if (row >= a.height || col >= b.width) {
     return;
   }
 
-  // Cache all rows in the block.
-  a_tile[threadIdx.y][threadIdx.x] = a[row * a_cols + threadIdx.x];
+  // Load a_tile from global memory to shared memory
+  a_tile[threadIdx.y][threadIdx.x] = a.elements[row * a.width + threadIdx.x];
 
-  __syncwarp();
+  // Synchronize to make sure the tile is loaded
+  __syncthreads();
 
   auto sum{0.0f};
 
-  // i to iterate over the columns of A and rows of B.
-  for (std::size_t i{0}; i < a_cols; ++i) {
-    sum += a_tile[threadIdx.y][i] * b[i * b_cols + col];
+  // Perform the computation
+  for (std::size_t i{0}; i < kBlockSize; ++i) {
+    sum += a_tile[threadIdx.y][i] * b.elements[i * b.width + col];
   }
-  c[row * b_cols + col] = sum;
+
+  c.elements[row * b.width + col] = sum;
 }
 
-__global__ void SimpleMultiply(float* a, float* b, float* c, int a_rows,
-                               int a_cols, int b_cols) {
+__global__ void SimpleMultiply(Matrix const a, Matrix const b, Matrix c) {
   auto row{blockIdx.y * blockDim.y + threadIdx.y};
   auto col{blockIdx.x * blockDim.x + threadIdx.x};
 
-  if (row >= a_rows || col >= b_cols) {
+  if (row >= a.height || col >= b.width) {
     return;
   }
 
   // Output sample kernel info
-  if (row == a_rows / 2 && col == b_cols / 2) {
+  if (row == a.height / 2 && col == b.width / 2) {
     printf("Sample kernel info:\n");
     printf(
         "Block (%d, %d), Thread (%d, %d)\nRow = blockIdx.y * blockDim.y + "
@@ -56,45 +115,43 @@ __global__ void SimpleMultiply(float* a, float* b, float* c, int a_rows,
   }
 
   auto sum{0.0f};
-  for (std::size_t i{0}; i < a_cols; ++i) {
-    sum += a[row * a_cols + i] * b[i * b_cols + col];
+  for (std::size_t i{0}; i < a.width; ++i) {
+    sum += GetElement(a, row, i) * GetElement(b, i, col);
   }
-  c[row * b_cols + col] = sum;
+  SetElement(c, row, col, sum);
 }
 
-void MatrixMultiply(float const* const h_a, float const* const h_b,
-                    float* const h_c, std::size_t const a_rows,
-                    std::size_t const a_cols, std::size_t const b_cols,
+void MatrixMultiply(Matrix const& h_a, Matrix const& h_b, Matrix& h_c,
                     MatrixMultiplyType const type) {
-  float *d_a{nullptr}, *d_b{nullptr}, *d_c{nullptr};
+  Matrix d_a;
+  d_a.width = d_a.stride = h_a.width;
+  d_a.height = h_a.height;
+  std::size_t size{h_a.width * h_a.height * sizeof(float)};
+  cudaError_t err{cudaMalloc(&d_a.elements, size)};
+  cudaMemcpy(d_a.elements, h_a.elements, size, cudaMemcpyHostToDevice);
 
-  // Allocate device memory
-  auto err{cudaMalloc((void**)&d_a, a_rows * a_cols * sizeof(float))};
-  CheckCudaError(err, "Failed to allocate device memory for d_a");
+  Matrix d_b;
+  d_b.width = d_b.stride = h_b.width;
+  d_b.height = h_b.height;
+  size = h_b.width * h_b.height * sizeof(float);
+  err = cudaMalloc(&d_b.elements, size);
+  cudaMemcpy(d_b.elements, h_b.elements, size, cudaMemcpyHostToDevice);
 
-  err = cudaMalloc((void**)&d_b, a_cols * b_cols * sizeof(float));
-  CheckCudaError(err, "Failed to allocate device memory for d_b");
+  Matrix d_c;
+  d_c.width = d_c.stride = h_c.width;
+  d_c.height = h_c.height;
+  size = h_c.width * h_c.height * sizeof(float);
+  err = cudaMalloc(&d_c.elements, size);
 
-  err = cudaMalloc((void**)&d_c, a_rows * b_cols * sizeof(float));
-  CheckCudaError(err, "Failed to allocate device memory for d_c");
-
-  // Transfer data from host to device
-  err = cudaMemcpy(d_a, h_a, a_rows * a_cols * sizeof(float),
-                   cudaMemcpyHostToDevice);
-  CheckCudaError(err, "Failed to copy h_a to d_a");
-
-  err = cudaMemcpy(d_b, h_b, a_cols * b_cols * sizeof(float),
-                   cudaMemcpyHostToDevice);
-  CheckCudaError(err, "Failed to copy h_b to d_b");
-
-  dim3 block_size(TILE_DIM, TILE_DIM);
-  dim3 grid_size(DivUp(b_cols, TILE_DIM), DivUp(a_rows, TILE_DIM));
+  dim3 block_size(kBlockSize, kBlockSize);
+  dim3 grid_size(DivUp(h_b.width, block_size.x),
+                 DivUp(h_a.height, block_size.y));
 
   // Print kernel info
   std::cout << "Kernel info: " << std::endl;
-  std::cout << "Data size: " << "row: " << a_rows << " x col: " << b_cols
+  std::cout << "Data size: " << "row: " << h_a.height << " x col: " << h_b.width
             << std::endl;
-  std::cout << "Element number: " << a_rows * b_cols << std::endl;
+  std::cout << "Element number: " << h_a.height * h_b.width << std::endl;
   std::cout << "Block size: " << block_size.x << " x " << block_size.y
             << std::endl;
   std::cout << "Grid size: " << grid_size.x << " x " << grid_size.y << std::endl
@@ -111,17 +168,17 @@ void MatrixMultiply(float const* const h_a, float const* const h_b,
   // Calling the kernel
   switch (type) {
     case MatrixMultiplyType::kSimple: {
-      SimpleMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c, a_rows, a_cols,
-                                                b_cols);
+      SimpleMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c);
       break;
     }
     case MatrixMultiplyType::kCoalesced: {
-      CoalescedMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c, a_rows,
-                                                   a_cols, b_cols);
+      CoalescedMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c);
       break;
     }
-    default:
+    case MatrixMultiplyType::kSharedAB: {
+      // SharedABMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c);
       break;
+    }
     default: {
       break;
     }
@@ -153,9 +210,9 @@ void MatrixMultiply(float const* const h_a, float const* const h_b,
 
   // Calculate bandwidth
   // A and B matrices
-  float data_size_gb{2.0f * a_rows * a_cols * sizeof(float) /
+  float data_size_gb{2.0f * h_a.height * h_a.stride * sizeof(float) /
                      (1024.0f * 1024.0f * 1024.0f)};
-  data_size_gb += a_rows * b_cols * sizeof(float) /
+  data_size_gb += h_a.height * h_a.stride * sizeof(float) /
                   (1024.0f * 1024.0f * 1024.0f);             // C matrix
   float bandwidth{data_size_gb / (elapsed_time / 1000.0f)};  // Convert ms to s
   std::cout << "Kernel bandwidth: " << bandwidth << " GB/s" << std::endl
@@ -171,14 +228,13 @@ void MatrixMultiply(float const* const h_a, float const* const h_b,
   CheckCudaError(err, "Kernel execution failed");
 
   // Transfer data from device to host
-  err = cudaMemcpy(h_c, d_c, a_rows * b_cols * sizeof(float),
-                   cudaMemcpyDeviceToHost);
+  err = cudaMemcpy(h_c.elements, d_c.elements, size, cudaMemcpyDeviceToHost);
   CheckCudaError(err, "Failed to copy d_c to h_c");
 
-  // Free device memory
-  cudaFree(d_a);
-  cudaFree(d_b);
-  cudaFree(d_c);
+  // // Free device memory
+  cudaFree(d_a.elements);
+  cudaFree(d_b.elements);
+  cudaFree(d_c.elements);
 }
 
 }  // namespace cuda_lab::matrix_multiply

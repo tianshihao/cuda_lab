@@ -19,5 +19,6 @@ file(GLOB HEADERS
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cudart)
 
 message(STATUS "CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")

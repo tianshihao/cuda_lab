@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <iostream>
 
+#include "matrix.h"
+
 namespace cuda_lab::matrix_multiply {
 
 void CheckCudaError(cudaError_t const err, char const* msg) {
@@ -15,17 +17,15 @@ void CheckCudaError(cudaError_t const err, char const* msg) {
   }
 }
 
-void PrintMatrix(const float* const matrix, std::size_t const rows,
-                 std::size_t const cols, std::size_t const tile_size,
-                 const char* const name) {
-  std::cout << "Matrix " << name << " (partial):" << std::endl;
-  for (std::size_t i{0}; i < tile_size && i < rows; ++i) {
-    for (std::size_t j{0}; j < tile_size && j < cols; ++j) {
-      std::cout << matrix[i * cols + j] << " ";
+void PrintMatrix(Matrix const& m, std::string const& n) {
+  std::cout << "Matrix " << n << " (partial):" << std::endl;
+  for (std::size_t i{0}; i < kBlockSize && i < m.height; ++i) {
+    for (std::size_t j{0}; j < kBlockSize && j < m.width; ++j) {
+      std::cout << m.elements[i * m.width + j] << " ";
     }
     std::cout << std::endl;
   }
-  std::cout << "Shape of Matrix " << name << ": " << rows << " x " << cols
+  std::cout << "Shape of Matrix " << n << ": " << m.height << " x " << m.width
             << std::endl
             << std::endl;
 }
