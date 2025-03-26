@@ -10,7 +10,10 @@ namespace cuda_lab::matrix_multiply {
 
 __device__ float GetElement(Matrix const m, std::size_t const row,
                             std::size_t const col) {
-  // return m.elements[row * m.stride + col];
+  // Check for out-of-bounds access
+  if (row >= m.height || col >= m.width) {
+    return 0.0f;  // Return 0 for out-of-bounds elements
+  }
   return m.elements[row * m.stride + col];
 }
 
