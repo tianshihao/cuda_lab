@@ -28,8 +28,15 @@ endif()
 
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --extended-lambda")
 
+if(WIN32)
+  set(CUDAToolkit_ROOT $ENV{CUDAToolkit_ROOT})
+  message(STATUS "CUDAToolkit_ROOT: ${CUDAToolkit_ROOT}")
+endif()
+
 # Find packages
-find_package(OpenCV REQUIRED)
+if(NOT WIN32)
+  find_package(OpenCV REQUIRED)
+endif()
 
 include_directories(${OpenCV_INCLUDE_DIRS})
 
