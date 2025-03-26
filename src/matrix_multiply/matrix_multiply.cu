@@ -29,44 +29,46 @@ __device__ Matrix GetSubMatrix(Matrix const m, std::size_t const row,
 
   return a_sub;
 }
-// __global__ void SharedABMultiply(Matrix const a, Matrix const b, Matrix c) {
-//   auto block_row{blockIdx.x};
-//   auto block_col{blockIdx.y};
+__global__ void SharedABMultiply(Matrix const a, Matrix const b, Matrix c) {
+  auto block_row{blockIdx.y};
+  auto block_col{blockIdx.x};
 
-//   // Each thread block computes one sub-matrix of c
-//   auto c_sub{GetSubMatrix(c, block_row, block_col)};
+  // Each thread block computes one sub-matrix of c
+  auto c_sub{GetSubMatrix(c, block_row, block_col)};
 
-//   // Each thread computes one element of c_sub by accumulating results into
-//   // c_value
-//   auto c_value{0.0f};
+  // Each thread computes one element of c_sub by accumulating results into
+  // c_value
+  auto c_value{0.0f};
 
-//   // Thread row and within the c_sub
-//   auto row{threadIdx.y};
-//   auto col{threadIdx.x};
+  // Thread row and within the c_sub
+  auto row{threadIdx.y};
+  auto col{threadIdx.x};
 
-//   for (std::size_t m{0}; m < a.width / BLOCK_SIZE; ++m) {
-//     auto a_sub{GetSubMatrix(a, block_row, m)};
-//     auto b_sub{GetSubMatrix(b, m, block_col)};
+  for (std::size_t m{0}; m < DivUp(a.width, kBlockSize); ++m) {
+    auto a_sub{GetSubMatrix(a, block_row, m)};
+    auto b_sub{GetSubMatrix(b, m, block_col)};
 
-//     __shared__ float a_tile[BLOCK_SIZE]
-//                            [BLOCK_SIZE];  // Shared memory for a sub-matrix
-//     __shared__ float b_tile[BLOCK_SIZE]
-//                            [BLOCK_SIZE];  // Shared memory for b sub-matrix
+    __shared__ float a_tile[kBlockSize]
+                           [kBlockSize];  // Shared memory for a sub-matrix
+    __shared__ float b_tile[kBlockSize]
+                           [kBlockSize];  // Shared memory for b sub-matrix
 
-//     a_tile[row][col] = GetElement(a_sub, row, col);
-//     b_tile[row][col] = GetElement(b_sub, row, col);
+    a_tile[row][col] = GetElement(a_sub, row, col);
+    b_tile[row][col] = GetElement(b_sub, row, col);
 
-//     __syncthreads();  // Synchronize to make sure the tile is loaded
+    __syncthreads();  // Synchronize to make sure the tile is loaded
 
-//     for (std::size_t e{0}; e < BLOCK_SIZE; ++e) {
-//       c_value += a_tile[row][e] * b_tile[e][col];
-//     }
+    for (std::size_t e{0}; e < kBlockSize; ++e) {
+      c_value += a_tile[row][e] * b_tile[e][col];
+    }
 
-//     __syncthreads();  // Synchronize to make sure the tile is loaded
-//   }
+    __syncthreads();  // Synchronize to make sure the tile is loaded
+  }
 
-//   SetElement(c_sub, row, col, c_value);  // Write the result to c
-// }
+  if (row < c.height && col < c.width) {
+    SetElement(c_sub, row, col, c_value);  // Write the result to c
+  }
+}
 
 __global__ void CoalescedMultiply(Matrix const a, Matrix const b, Matrix c) {
   // Share memory on chip
@@ -80,7 +82,8 @@ __global__ void CoalescedMultiply(Matrix const a, Matrix const b, Matrix c) {
   }
 
   // Load a_tile from global memory to shared memory
-  a_tile[threadIdx.y][threadIdx.x] = a.elements[row * a.width + threadIdx.x];
+  a_tile[threadIdx.y][threadIdx.x] = a.elements[row * kBlockSize + threadIdx.x];
+  // a_tile[threadIdx.y][threadIdx.x] = a.elements[row * a.width + threadIdx.x];
 
   // Synchronize to make sure the tile is loaded
   __syncthreads();
@@ -89,10 +92,11 @@ __global__ void CoalescedMultiply(Matrix const a, Matrix const b, Matrix c) {
 
   // Perform the computation
   for (std::size_t i{0}; i < kBlockSize; ++i) {
-    sum += a_tile[threadIdx.y][i] * b.elements[i * b.width + col];
+    sum += a_tile[i][threadIdx.x] * GetElement(b, i, col);
   }
 
-  c.elements[row * b.width + col] = sum;
+  // c.elements[row * b.width + col] = sum;
+  SetElement(c, row, col, sum);
 }
 
 __global__ void SimpleMultiply(Matrix const a, Matrix const b, Matrix c) {
@@ -126,22 +130,22 @@ void MatrixMultiply(Matrix const& h_a, Matrix const& h_b, Matrix& h_c,
   Matrix d_a;
   d_a.width = d_a.stride = h_a.width;
   d_a.height = h_a.height;
-  std::size_t size{h_a.width * h_a.height * sizeof(float)};
-  cudaError_t err{cudaMalloc(&d_a.elements, size)};
-  cudaMemcpy(d_a.elements, h_a.elements, size, cudaMemcpyHostToDevice);
+  std::size_t size_a{h_a.width * h_a.height * sizeof(float)};
+  cudaError_t err{cudaMalloc(&d_a.elements, size_a)};
+  cudaMemcpy(d_a.elements, h_a.elements, size_a, cudaMemcpyHostToDevice);
 
   Matrix d_b;
   d_b.width = d_b.stride = h_b.width;
   d_b.height = h_b.height;
-  size = h_b.width * h_b.height * sizeof(float);
-  err = cudaMalloc(&d_b.elements, size);
-  cudaMemcpy(d_b.elements, h_b.elements, size, cudaMemcpyHostToDevice);
+  std::size_t size_b{h_b.width * h_b.height * sizeof(float)};
+  err = cudaMalloc(&d_b.elements, size_b);
+  cudaMemcpy(d_b.elements, h_b.elements, size_b, cudaMemcpyHostToDevice);
 
   Matrix d_c;
   d_c.width = d_c.stride = h_c.width;
   d_c.height = h_c.height;
-  size = h_c.width * h_c.height * sizeof(float);
-  err = cudaMalloc(&d_c.elements, size);
+  std::size_t size_c{h_c.width * h_c.height * sizeof(float)};
+  err = cudaMalloc(&d_c.elements, size_c);
 
   dim3 block_size(kBlockSize, kBlockSize);
   dim3 grid_size(DivUp(h_b.width, block_size.x),
@@ -176,7 +180,7 @@ void MatrixMultiply(Matrix const& h_a, Matrix const& h_b, Matrix& h_c,
       break;
     }
     case MatrixMultiplyType::kSharedAB: {
-      // SharedABMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c);
+      SharedABMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c);
       break;
     }
     default: {
@@ -190,32 +194,21 @@ void MatrixMultiply(Matrix const& h_a, Matrix const& h_b, Matrix& h_c,
   // Wait for the stop event to complete
   cudaEventSynchronize(stop);
 
-  switch (type) {
-    case MatrixMultiplyType::kSimple:
-      std::cout << "SimpleMultiply executed." << std::endl;
-      break;
-
-    case MatrixMultiplyType::kCoalesced:
-      std::cout << "CoalescedMultiply executed." << std::endl;
-      break;
-
-    default:
-      break;
-  }
-
   // Calculate the elapsed time
-  float elapsed_time;
-  cudaEventElapsedTime(&elapsed_time, start, stop);
-  std::cout << "Kernel execution time: " << elapsed_time << " ms" << std::endl;
+  float elapsed_time_ms;
+  cudaEventElapsedTime(&elapsed_time_ms, start, stop);
+  float elapsed_time_s{elapsed_time_ms / 1000.0f};
+
+  std::cout << "Kernel execution time: " << elapsed_time_ms << " ms"
+            << std::endl;
 
   // Calculate bandwidth
-  // A and B matrices
-  float data_size_gb{2.0f * h_a.height * h_a.stride * sizeof(float) /
-                     (1024.0f * 1024.0f * 1024.0f)};
-  data_size_gb += h_a.height * h_a.stride * sizeof(float) /
-                  (1024.0f * 1024.0f * 1024.0f);             // C matrix
-  float bandwidth{data_size_gb / (elapsed_time / 1000.0f)};  // Convert ms to s
-  std::cout << "Kernel bandwidth: " << bandwidth << " GB/s" << std::endl
+  float total_data_size_gb{(size_a + size_b + size_c) /
+                           (1024.0f * 1024.0f * 1024.0f)};
+  float bandwidth_gb_per_s{total_data_size_gb / elapsed_time_s};
+
+  std::cout << "Total data size: " << total_data_size_gb << " GB" << std::endl;
+  std::cout << "Bandwidth: " << bandwidth_gb_per_s << " GB/s" << std::endl
             << std::endl;
 
   // Destroy CUDA events
@@ -228,10 +221,10 @@ void MatrixMultiply(Matrix const& h_a, Matrix const& h_b, Matrix& h_c,
   CheckCudaError(err, "Kernel execution failed");
 
   // Transfer data from device to host
-  err = cudaMemcpy(h_c.elements, d_c.elements, size, cudaMemcpyDeviceToHost);
+  err = cudaMemcpy(h_c.elements, d_c.elements, size_c, cudaMemcpyDeviceToHost);
   CheckCudaError(err, "Failed to copy d_c to h_c");
 
-  // // Free device memory
+  // Free device memory
   cudaFree(d_a.elements);
   cudaFree(d_b.elements);
   cudaFree(d_c.elements);
