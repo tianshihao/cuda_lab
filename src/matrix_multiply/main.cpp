@@ -69,14 +69,14 @@ void Test2() {
   std::fill_n(c.elements, c.height * c.stride, 0.0f);
 
   cuda_lab::matrix_multiply::MatrixMultiply(
-      a, b, c, cuda_lab::matrix_multiply::MatrixMultiplyType::kSimple);
+      a, b, c, cuda_lab::matrix_multiply::MatrixMultiplyType::kSharedAB);
 
   cuda_lab::matrix_multiply::PrintMatrix(c, "C");
 }
 
 int main() {
-  // Test1();
-  Test2();
+  Test1();
+  // Test2();
 
   return 0;
 }

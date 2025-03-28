@@ -9,7 +9,7 @@
 
 namespace cuda_lab::matrix_multiply {
 
-constexpr std::size_t kBlockSize{16};
+constexpr std::size_t kBlockSize{3};
 constexpr std::size_t kTileSize{16};
 
 enum class MatrixMultiplyType : std::size_t {
