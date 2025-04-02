@@ -10,7 +10,6 @@ namespace cuda_lab::matrix_multiply {
 
 __device__ float GetElement(Matrix const m, std::size_t const row,
                             std::size_t const col) {
-  // return m.elements[row * m.stride + col];
   return m.elements[row * m.stride + col];
 }
 
@@ -19,19 +18,33 @@ __device__ float SetElement(Matrix const m, std::size_t const row,
   m.elements[row * m.stride + col] = value;
 }
 
+// Get the kBlockSize * kBlockSize sub-matrix m_sub of m that is
+// located col sub-matrices to the right and row sub-matrices down
+// from the upper-left corner of m
 __device__ Matrix GetSubMatrix(Matrix const m, std::size_t const row,
                                std::size_t const col) {
-  Matrix a_sub;
-  a_sub.height = kBlockSize;
-  a_sub.width = kBlockSize;
-  a_sub.stride = m.stride;
-  a_sub.elements = &m.elements[m.stride * kBlockSize * row + kBlockSize * col];
+  Matrix m_sub;
+  m_sub.height = kBlockSize;
+  m_sub.width = kBlockSize;
+  m_sub.stride = m.stride;
+  m_sub.elements = &m.elements[m.stride * kBlockSize * row + kBlockSize * col];
 
-  return a_sub;
+  return m_sub;
 }
+
 __global__ void SharedABMultiply(Matrix const a, Matrix const b, Matrix c) {
   auto block_row{blockIdx.y};
   auto block_col{blockIdx.x};
+
+  // auto global_row{block_row * kBlockSize + threadIdx.y};
+  // auto global_col{block_col * kBlockSize + threadIdx.x};
+
+  // if (global_row >= a.height || global_col >= b.width) {
+  //   return;
+  // }
+
+  // printf("global_row: %u, global_col: %u\n", global_row, global_col);
+  // __syncthreads();  // Synchronize to make sure the tile is loaded
 
   // Each thread block computes one sub-matrix of c
   auto c_sub{GetSubMatrix(c, block_row, block_col)};
@@ -44,7 +57,21 @@ __global__ void SharedABMultiply(Matrix const a, Matrix const b, Matrix c) {
   auto row{threadIdx.y};
   auto col{threadIdx.x};
 
+  auto flag{blockIdx.x == 1 && blockIdx.y == 0};
+
+  if (flag) {
+    printf("threadIdx.x: %u, threadIdx.y: %u\n", threadIdx.x, threadIdx.y);
+  }
+
+  // Loop over all the sub-matrices of A and B that are
+  // required to compute Csub
+  // Multiply each pair of sub-matrices together
+  // and accumulate the results
   for (std::size_t m{0}; m < DivUp(a.width, kBlockSize); ++m) {
+    if (flag) {
+      printf("m: %u\n", m);
+    }
+
     auto a_sub{GetSubMatrix(a, block_row, m)};
     auto b_sub{GetSubMatrix(b, m, block_col)};
 
@@ -56,47 +83,77 @@ __global__ void SharedABMultiply(Matrix const a, Matrix const b, Matrix c) {
     a_tile[row][col] = GetElement(a_sub, row, col);
     b_tile[row][col] = GetElement(b_sub, row, col);
 
+    if (flag) {
+      printf("a_tile[%u][%u]: %f, b_tile[%u][%u]: %f\n", row, col,
+             a_tile[row][col], row, col, b_tile[row][col]);
+    }
+
     __syncthreads();  // Synchronize to make sure the tile is loaded
 
     for (std::size_t e{0}; e < kBlockSize; ++e) {
       c_value += a_tile[row][e] * b_tile[e][col];
     }
 
+    if (flag) {
+      printf("c_value: %f, row: %u, col: %u\n", c_value, row, col);
+    }
+
     __syncthreads();  // Synchronize to make sure the tile is loaded
   }
 
   if (row < c.height && col < c.width) {
+    if (flag) {
+      printf("row: %u, col: %u, c_value: %f\n", row, col, c_value);
+    }
     SetElement(c_sub, row, col, c_value);  // Write the result to c
   }
 }
 
 __global__ void CoalescedMultiply(Matrix const a, Matrix const b, Matrix c) {
-  // Share memory on chip
-  __shared__ float a_tile[kBlockSize][kBlockSize];
+  auto row_in_c{blockIdx.y * kBlockSize + threadIdx.y};
+  auto col_in_c{blockIdx.x * kBlockSize + threadIdx.x};
 
-  auto row{blockIdx.y * blockDim.y + threadIdx.y};
-  auto col{blockIdx.x * blockDim.x + threadIdx.x};
-
-  if (row >= a.height || col >= b.width) {
+  // Skip the threads that are outside the bounds of c
+  if (row_in_c >= c.height && col_in_c >= c.width) {
     return;
   }
 
-  // Load a_tile from global memory to shared memory
-  a_tile[threadIdx.y][threadIdx.x] = a.elements[row * kBlockSize + threadIdx.x];
-  // a_tile[threadIdx.y][threadIdx.x] = a.elements[row * a.width + threadIdx.x];
+  auto block_row{blockIdx.y};
+  auto block_col{blockIdx.x};
+  auto c_sub{GetSubMatrix(c, block_row, block_col)};
+  auto c_value{0.0f};
 
-  // Synchronize to make sure the tile is loaded
-  __syncthreads();
+  auto row_in_block{threadIdx.y};
+  auto col_in_block{threadIdx.x};
 
-  auto sum{0.0f};
+  for (std::size_t m{0}; m < DivUp(a.width, kBlockSize); ++m) {
+    auto a_sub{GetSubMatrix(a, block_row, m)};
 
-  // Perform the computation
-  for (std::size_t i{0}; i < kBlockSize; ++i) {
-    sum += a_tile[i][threadIdx.x] * GetElement(b, i, col);
+    // Share memory on chip
+    __shared__ float a_tile[kBlockSize][kBlockSize];
+
+    // Recalculate global_col for each sliding window
+    global_col += m * kBlockSize;
+
+    // Load a_tile from global memory to shared memory
+    if (global_col < a.width) {
+      a_tile[row_in_block][col_in_block] =
+          GetElement(a_sub, row_in_block, col_in_block);
+    } else {
+      a_tile[row_in_block][col_in_block] = 0.0f;
+    }
+
+    // Synchronize to make sure the tile is loaded
+    __syncthreads();
+
+    for (std::size_t e{0}; e < kBlockSize; ++e) {
+      c_value += a_tile[row_in_block][e] * GetElement(b, e, col_in_c);
+    }
+
+    __syncthreads();
   }
 
-  // c.elements[row * b.width + col] = sum;
-  SetElement(c, row, col, sum);
+  SetElement(c_sub, row_in_block, col_in_block, c_value);
 }
 
 __global__ void SimpleMultiply(Matrix const a, Matrix const b, Matrix c) {
@@ -105,17 +162,6 @@ __global__ void SimpleMultiply(Matrix const a, Matrix const b, Matrix c) {
 
   if (row >= a.height || col >= b.width) {
     return;
-  }
-
-  // Output sample kernel info
-  if (row == a.height / 2 && col == b.width / 2) {
-    printf("Sample kernel info:\n");
-    printf(
-        "Block (%d, %d), Thread (%d, %d)\nRow = blockIdx.y * blockDim.y + "
-        "threadIdx.y = %d * %d + %d = %d\nCol = blockIdx.x * blockDim.x + "
-        "threadIdx.x = %d * %d + %d = %d\n\n",
-        blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y, blockIdx.y,
-        blockDim.y, threadIdx.y, row, blockIdx.x, blockIdx.y, threadIdx.x, col);
   }
 
   auto sum{0.0f};
@@ -172,14 +218,17 @@ void MatrixMultiply(Matrix const& h_a, Matrix const& h_b, Matrix& h_c,
   // Calling the kernel
   switch (type) {
     case MatrixMultiplyType::kSimple: {
+      std::cout << "SimpleMultiply is called" << std::endl << std::endl;
       SimpleMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c);
       break;
     }
     case MatrixMultiplyType::kCoalesced: {
+      std::cout << "CoalescedMultiply is called" << std::endl << std::endl;
       CoalescedMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c);
       break;
     }
     case MatrixMultiplyType::kSharedAB: {
+      std::cout << "SharedABMultiply is called" << std::endl << std::endl;
       SharedABMultiply<<<grid_size, block_size>>>(d_a, d_b, d_c);
       break;
     }
