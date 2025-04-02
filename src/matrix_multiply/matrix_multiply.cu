@@ -126,21 +126,41 @@ __global__ void CoalescedMultiply(Matrix const a, Matrix const b, Matrix c) {
   auto row_in_block{threadIdx.y};
   auto col_in_block{threadIdx.x};
 
-  for (std::size_t m{0}; m < DivUp(a.width, kBlockSize); ++m) {
-    auto a_sub{GetSubMatrix(a, block_row, m)};
+  auto flag{row_in_c == 1 && false};
+
+  // Slide the window to load a_tile
+  // window size is equal to block size
+  auto window_num{DivUp(a.width, kBlockSize)};
+  if (flag) {
+    printf("window_num: %u, a.width: %u, block size: %u\n", window_num, a.width,
+           kBlockSize);
+  }
+  for (std::size_t window_idx{0}; window_idx < window_num; ++window_idx) {
+    // Move a_sub to next slide window
+    auto a_sub{GetSubMatrix(a, block_row, window_idx)};
 
     // Share memory on chip
     __shared__ float a_tile[kBlockSize][kBlockSize];
 
-    // Recalculate global_col for each sliding window
-    global_col += m * kBlockSize;
+    // Recalculate col_in_c for each sliding window
+    // tmp += window_idx * kBlockSize;
+    // printf("tmp: %u\n", tmp);
 
     // Load a_tile from global memory to shared memory
-    if (global_col < a.width) {
+    auto new_global_col{col_in_block + window_idx * kBlockSize};
+    if (flag) {
+      printf(
+          "new_global_col: %u, col_in_block: %u, window_idx: %u, a.width: %u\n",
+          new_global_col, col_in_block, window_idx, a.width);
+    }
+    if (new_global_col < c.width) {
+      // Load a_tile from a_sub
       a_tile[row_in_block][col_in_block] =
           GetElement(a_sub, row_in_block, col_in_block);
     } else {
+      // If the last window is incompleted
       a_tile[row_in_block][col_in_block] = 0.0f;
+      return;
     }
 
     // Synchronize to make sure the tile is loaded
