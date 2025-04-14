@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cuda_runtime.h>
-
 #include <cstddef>
 
 namespace cuda_lab::matrix_multiply {
