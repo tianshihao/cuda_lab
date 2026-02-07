@@ -1,13 +1,23 @@
-CompileFlags:
-  Add:
-    - --cuda-path=/usr/local/cuda-11.6
-    - -L/usr/local/cuda-11.6/lib64
-    - -I/usr/local/cuda-11.6/include
-    - --cuda-gpu-arch=sm_86
-  Remove:
-    - -forward-unknown-to-host-compiler
-    - --generate-code=arch=compute_86,code=[compute_86,sm_86]
-    - --options-file
+# CompileFlags:
+#   Add:
+#     - --cuda-path=/usr/local/cuda-11.6
+#     - -L/usr/local/cuda-11.6/lib64
+#     - -I/usr/local/cuda-11.6/include
 
-# Use the Google style guide
-# Style: Google
+CompileFlags:
+    Remove:
+        - "--expt-extended-lambda"
+        - '-gencode=arch=compute_60,code="sm_60,compute_60"'
+        - "-rdc=true"
+        - '-forward-unknown-to-host-compiler'
+        - '--expt-relaxed-constexpr'
+        - '--generate-code=arch=compute_86,code=[compute_86,sm_86]'
+        - '-forward-unknown-to-host-compiler'
+        - '-arch=native'
+        - '--options-file'
+        - '-Xcompiler=-fPIC'
+        - '-fe'
+    Add: 
+        - '-std=c++17'
+        - '--cuda-gpu-arch=sm_86'
+    Compiler: /usr/bin/clang++
