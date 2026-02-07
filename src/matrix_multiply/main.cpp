@@ -7,6 +7,9 @@
 #include "matrix.h"
 #include "matrix_multiply.h"
 
+constexpr cuda_lab::matrix_multiply::MatrixMultiplyType kMatrixMultiplyType{
+    cuda_lab::matrix_multiply::MatrixMultiplyType::kSharedAB};
+
 void Test1() {
   cuda_lab::matrix_multiply::Matrix a;
   a.height = 2;
@@ -35,15 +38,15 @@ void Test1() {
   c.elements = new float[c.height * c.stride];
   std::fill_n(c.elements, c.height * c.stride, 0.0f);
 
-  cuda_lab::matrix_multiply::MatrixMultiply(
-      a, b, c, cuda_lab::matrix_multiply::MatrixMultiplyType::kSharedAB);
+  cuda_lab::matrix_multiply::MatrixMultiply(a, b, c, kMatrixMultiplyType);
 
   cuda_lab::matrix_multiply::PrintMatrix(c, "C");
 }
 
 void Test2() {
   cuda_lab::matrix_multiply::Matrix a;
-  a.height = 1600;
+  // a.height = 1600;
+  a.height = 16;
   a.width = cuda_lab::matrix_multiply::kBlockSize;
   a.stride = cuda_lab::matrix_multiply::kBlockSize;
   a.elements = new float[a.height * a.stride];
@@ -52,8 +55,10 @@ void Test2() {
 
   cuda_lab::matrix_multiply::Matrix b;
   b.height = cuda_lab::matrix_multiply::kBlockSize;
-  b.width = 192000;
-  b.stride = 192000;
+  b.width = 192;
+  b.stride = 192;
+  // b.width = 192000;
+  // b.stride = 192000;
   b.elements = new float[b.height * b.stride];
   std::vector<float> h_data_b(b.height * b.stride, 2.0f);
   std::copy(h_data_b.begin(), h_data_b.end(), b.elements);
@@ -68,15 +73,14 @@ void Test2() {
   c.elements = new float[c.height * c.stride];
   std::fill_n(c.elements, c.height * c.stride, 0.0f);
 
-  cuda_lab::matrix_multiply::MatrixMultiply(
-      a, b, c, cuda_lab::matrix_multiply::MatrixMultiplyType::kSimple);
+  cuda_lab::matrix_multiply::MatrixMultiply(a, b, c, kMatrixMultiplyType);
 
   cuda_lab::matrix_multiply::PrintMatrix(c, "C");
 }
 
 int main() {
-  // Test1();
-  Test2();
+  Test1();
+  // Test2();
 
   return 0;
 }

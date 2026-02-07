@@ -20,8 +20,10 @@ void CheckCudaError(cudaError_t const err, char const* msg) {
 
 void PrintMatrix(Matrix const& m, std::string const& n) {
   std::cout << "Matrix " << n << " (partial):" << std::endl;
-  for (std::size_t i{0}; i < kBlockSize && i < m.height; ++i) {
-    for (std::size_t j{0}; j < kBlockSize && j < m.width; ++j) {
+  for (std::size_t i{0}; i < kBlockSize; ++i) {
+    for (std::size_t j{0}; j < kBlockSize; ++j) {
+  // for (std::size_t i{0}; i < m.height; ++i) {
+  //   for (std::size_t j{0}; j < m.width; ++j) {
       std::cout << m.elements[i * m.width + j] << " ";
     }
     std::cout << std::endl;
