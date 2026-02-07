@@ -5,21 +5,20 @@
 
 #include "hello_cuda.h"
 
-namespace cuda_image_lab::hello_cuda {
-__global__ void HelloCudaKernel() { printf("HelloCuda, CUDA!\n"); }
+namespace cuda_lab::hello_cuda {
+__global__ void hello_world_kernel() { printf("Hello, CUDA!\n"); }
 
 void HelloCuda() {
   // Launch 1 block of 1 thread.
-  HelloCudaKernel<<<1, 1>>>();
-  cudaError_t cudaStatus{cudaDeviceSynchronize()};
+  hello_world_kernel<<<1, 1>>>();
+  auto cudaStatus{cudaDeviceSynchronize()};
   if (cudaStatus != cudaSuccess) {
     fprintf(stderr, "cudaDeviceSynchronize returned error code %d: %s\n",
             cudaStatus, cudaGetErrorString(cudaStatus));
   }
 }
 
-
-__global__ void ExampleKernel1D() {
+__global__ void example_1d_kernel() {
   auto thread_id_x{threadIdx.x};  // Thread index within the block
   auto block_id_x{blockIdx.x};    // Block index within the grid
   auto global_id_x{block_id_x * blockDim.x +
@@ -34,7 +33,7 @@ __global__ void ExampleKernel1D() {
          thread_id_x, block_id_x, global_id_x, global_in_grid);
 }
 
-__global__ void ExampleKernel2D() {
+__global__ void example_2d_kernel() {
   auto thread_id_x{threadIdx.x};  // Thread index within the block
   auto block_id_x{blockIdx.x};    // Block index within the grid
   auto global_id_x{block_id_x * blockDim.x +
@@ -57,7 +56,7 @@ __global__ void ExampleKernel2D() {
       global_id_y, global_in_grid);
 }
 
-__global__ void ExampleKernel3D() {
+__global__ void example_3d_kernel() {
   auto thread_id_x{threadIdx.x};  // Thread index within the block
   auto block_id_x{blockIdx.x};    // Block index within the grid
   auto global_id_x{block_id_x * blockDim.x +
@@ -88,19 +87,25 @@ __global__ void ExampleKernel3D() {
 }
 
 void KernalExample() {
+  std::cout << "1D Kernel Launch:" << std::endl;
   dim3 block_per_grid_1d(3);
-  dim3 thredd_per_block_1d(3);
-  ExampleKernel1D<<<block_per_grid_1d, thredd_per_block_1d>>>();
+  dim3 thread_per_block_1d(3);
+  example_1d_kernel<<<block_per_grid_1d, thread_per_block_1d>>>();
   cudaDeviceSynchronize();
+  std::cout << std::endl;
 
+  std::cout << "2D Kernel Launch:" << std::endl;
   dim3 block_per_grid_2d(2, 2);
   dim3 thread_per_block_2d(2, 2);
-  ExampleKernel2D<<<block_per_grid_2d, thread_per_block_2d>>>();
+  example_2d_kernel<<<block_per_grid_2d, thread_per_block_2d>>>();
   cudaDeviceSynchronize();
+  std::cout << std::endl;
 
+  std::cout << "3D Kernel Launch:" << std::endl;
   dim3 block_per_grid_3d(2, 2, 3);
   dim3 thread_per_block_3d(4, 2, 4);
-  ExampleKernel3D<<<block_per_grid_3d, thread_per_block_3d>>>();
+  example_3d_kernel<<<block_per_grid_3d, thread_per_block_3d>>>();
   cudaDeviceSynchronize();
+  std::cout << std::endl;
 }
-}  // namespace cuda_image_lab::hello_cuda
+}  // namespace cuda_lab::hello_cuda
