@@ -5,7 +5,7 @@
 
 #include "memory.hpp"
 
-namespace cuda_lab {
+namespace cuda_lab::pinned_memory {
 
 // Kernel adds 42 to each element.
 __global__ void test_kernel(int const* src, int* out, int const n) {
@@ -33,10 +33,10 @@ void CheckUva() {
             << (prop.unifiedAddressing ? "Yes" : "No") << std::endl;
 }
 
-}  // namespace cuda_lab
+}  // namespace cuda_lab::pinned_memory
 
 int main() {
-  using namespace cuda_lab;
+  using namespace cuda_lab::pinned_memory;
 
   CheckUva();
 
