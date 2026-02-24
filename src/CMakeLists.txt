@@ -1,3 +1,2 @@
-add_subdirectory(hello_cuda)
-add_subdirectory(async_overlap)
-add_subdirectory(matrix_multiply)
+include(${CMAKE_SOURCE_DIR}/cmake/AutoProject.cmake)
+auto_subdirs(${CMAKE_CURRENT_SOURCE_DIR})
