@@ -36,9 +36,9 @@ void CheckUva() {
 }  // namespace cuda_lab::pinned_memory
 
 int main() {
-  using namespace cuda_lab::pinned_memory;
+  using namespace cuda_lab;
 
-  CheckUva();
+  pinned_memory::CheckUva();
 
   constexpr size_t n{8};
 
@@ -99,7 +99,7 @@ int main() {
   // 5. Kernel validation
   // 5-1. Standard pinned: kernel access (may fail depending on UVA/platform)
   auto e1{cudaSuccess};
-  test_kernel<<<1, static_cast<int>(n)>>>(
+  pinned_memory::test_kernel<<<1, static_cast<int>(n)>>>(
       dev_addr_pinned, mem_out_pinned.device_ptr(), static_cast<int>(n));
   e1 = cudaDeviceSynchronize();
   std::cout << "[Kernel access pinned] Status: " << cudaGetErrorString(e1)
@@ -115,7 +115,7 @@ int main() {
 
   // 5-2
   auto e2{cudaSuccess};
-  test_kernel<<<1, static_cast<int>(n)>>>(
+  pinned_memory::test_kernel<<<1, static_cast<int>(n)>>>(
       dev_ptr_host_array, mem_out_pinned.device_ptr(), static_cast<int>(n));
   e2 = cudaDeviceSynchronize();
   std::cout << "[Kernel access HostRegister pinned] Status: "
@@ -131,7 +131,7 @@ int main() {
 
   // 5-3. Mapped pinned: kernel direct access (usually supported)
   auto e3{cudaSuccess};
-  test_kernel<<<1, static_cast<int>(n)>>>(
+  pinned_memory::test_kernel<<<1, static_cast<int>(n)>>>(
       dev_addr_mapped, mem_out_mapped.device_ptr(), static_cast<int>(n));
   e3 = cudaDeviceSynchronize();
   std::cout << "[Kernel access mapped] Status: " << cudaGetErrorString(e3)
