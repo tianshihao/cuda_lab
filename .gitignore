@@ -1,4 +1,6 @@
 build
 .cache
+*.csv
 src/*/CMakeLists.txt
+
 
