@@ -2,11 +2,11 @@
 
 #include <chrono>
 #include <iostream>
-#include <string_view>
 
+namespace cuda_lab {
 class ScopedTimer {
  public:
-  explicit ScopedTimer(std::string_view name) : name_{name} {
+  explicit ScopedTimer(std::string name) : name_{name} {
     start_ = std::chrono::high_resolution_clock::now();
   }
 
@@ -19,8 +19,10 @@ class ScopedTimer {
   }
 
  private:
-  std::string_view name_;
+  std::string name_;
   std::chrono::high_resolution_clock::time_point start_;
 };
 
 #define SCOPED_TIMER(name) ScopedTimer timer##__LINE__(name)
+
+}  // namespace cuda_lab
