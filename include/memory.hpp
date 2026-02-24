@@ -7,9 +7,9 @@
 #include <iostream>
 #include <stdexcept>
 
-namespace cuda_lab::async_overlap {
+namespace cuda_lab {
 
-enum class MemoryType { kHost = 0, kPinned, kDevice };
+enum class MemoryType { kHost = 0, kPinned, kDevice, kMappedPinned };
 
 template <typename T, MemoryType Type>
 class Memory {
@@ -18,14 +18,20 @@ class Memory {
       : n_{n}, raw_{nullptr}, bytes_{n * sizeof(T)} {
     if constexpr (Type == MemoryType::kPinned) {
       void* tmp{nullptr};
-      if (cudaMallocHost(&tmp, bytes_) != cudaSuccess) {
-        throw std::runtime_error("cudaMallocHost failed");
+      if (cudaHostAlloc(&tmp, bytes_, cudaHostAllocDefault) != cudaSuccess) {
+        throw std::runtime_error("cudaHostAlloc failed");
       }
       raw_ = static_cast<std::byte*>(tmp);
     } else if constexpr (Type == MemoryType::kDevice) {
       void* tmp{nullptr};
       if (cudaMalloc(&tmp, bytes_) != cudaSuccess) {
         throw std::runtime_error("cudaMalloc (device) failed");
+      }
+      raw_ = static_cast<std::byte*>(tmp);
+    } else if constexpr (Type == MemoryType::kMappedPinned) {
+      void* tmp{nullptr};
+      if (cudaHostAlloc(&tmp, bytes_, cudaHostAllocMapped) != cudaSuccess) {
+        throw std::runtime_error("cudaHostAlloc (mapped) failed");
       }
       raw_ = static_cast<std::byte*>(tmp);
     } else {
@@ -36,7 +42,8 @@ class Memory {
   }
 
   ~Memory() {
-    if constexpr (Type == MemoryType::kPinned) {
+    if constexpr (Type == MemoryType::kPinned ||
+                  Type == MemoryType::kMappedPinned) {
       if (raw_) {
         cudaFreeHost(raw_);
       }
@@ -60,7 +67,8 @@ class Memory {
   }
   Memory& operator=(Memory&& other) noexcept {
     if (this != &other) {
-      if constexpr (Type == MemoryType::kPinned) {
+      if constexpr (Type == MemoryType::kPinned ||
+                    Type == MemoryType::kMappedPinned) {
         if (raw_) {
           cudaFreeHost(raw_);
         }
@@ -97,6 +105,50 @@ class Memory {
     }
   }
   T* slice(std::size_t offset) { return data() + offset; }
+  T* device_ptr() {
+    if constexpr (Type == MemoryType::kMappedPinned) {
+      T* dev_ptr{nullptr};
+      if (cudaHostGetDevicePointer(&dev_ptr, raw_, 0) != cudaSuccess) {
+        throw std::runtime_error("cudaHostGetDevicePointer failed");
+      }
+      return dev_ptr;
+    } else if constexpr (Type == MemoryType::kDevice) {
+      return data();
+    } else if constexpr (Type == MemoryType::kPinned) {
+      return data();
+    } else if constexpr (Type == MemoryType::kHost) {
+      return data();
+    } else {
+      static_assert(
+          Type == MemoryType::kMappedPinned || Type == MemoryType::kDevice ||
+              Type == MemoryType::kPinned || Type == MemoryType::kHost,
+          "device_ptr() is only valid for mapped pinned, device, pinned, or "
+          "host memory");
+      return nullptr;
+    }
+  }
+  const T* device_ptr() const {
+    if constexpr (Type == MemoryType::kMappedPinned) {
+      T* dev_ptr{nullptr};
+      if (cudaHostGetDevicePointer(&dev_ptr, raw_, 0) != cudaSuccess) {
+        throw std::runtime_error("cudaHostGetDevicePointer failed");
+      }
+      return dev_ptr;
+    } else if constexpr (Type == MemoryType::kDevice) {
+      return data();
+    } else if constexpr (Type == MemoryType::kPinned) {
+      return data();
+    } else if constexpr (Type == MemoryType::kHost) {
+      return data();
+    } else {
+      static_assert(
+          Type == MemoryType::kMappedPinned || Type == MemoryType::kDevice ||
+              Type == MemoryType::kPinned || Type == MemoryType::kHost,
+          "device_ptr() is only valid for mapped pinned, device, pinned, or "
+          "host memory");
+      return nullptr;
+    }
+  }
 
  private:
   std::byte* raw_{nullptr};
@@ -104,4 +156,4 @@ class Memory {
   std::size_t bytes_{0};
 };
 
-}  // namespace cuda_lab::async_overlap
+}  // namespace cuda_lab
