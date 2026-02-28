@@ -85,8 +85,40 @@ class Memory {
     return *this;
   }
 
-  T* data() { return reinterpret_cast<T*>(raw_); }
-  T const* data() const { return reinterpret_cast<const T*>(raw_); }
+  T* host_ptr() {
+    if constexpr (Type == MemoryType::kHost || Type == MemoryType::kPinned ||
+                  Type == MemoryType::kMappedPinned) {
+      return reinterpret_cast<T*>(raw_);
+    } else {
+      return nullptr;
+    }
+  }
+  T const* host_ptr() const {
+    if constexpr (Type == MemoryType::kHost || Type == MemoryType::kPinned ||
+                  Type == MemoryType::kMappedPinned) {
+      return reinterpret_cast<const T*>(raw_);
+    } else {
+      return nullptr;
+    }
+  }
+  T* data() {
+    if constexpr (Type == MemoryType::kDevice ||
+                  Type == MemoryType::kMappedPinned ||
+                  Type == MemoryType::kPinned) {
+      return device_ptr();
+    } else {
+      return host_ptr();
+    }
+  }
+  T const* data() const {
+    if constexpr (Type == MemoryType::kDevice ||
+                  Type == MemoryType::kMappedPinned ||
+                  Type == MemoryType::kPinned) {
+      return device_ptr();
+    } else {
+      return host_ptr();
+    }
+  }
   std::size_t size() const { return n_; }
   std::size_t bytes() const { return bytes_; }
   void fill(T value) {
