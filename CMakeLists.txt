@@ -31,7 +31,7 @@ set(CMAKE_CUDA_ARCHITECTURES 75 86)
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wno-deprecated-gpu-targets")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  # set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G")  # enable cuda-gdb (expensive)
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G")  # enable cuda-gdb (expensive)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
