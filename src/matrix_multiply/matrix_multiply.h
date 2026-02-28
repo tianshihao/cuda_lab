@@ -1,30 +1,56 @@
 #pragma once
 
-#include <cuda_runtime.h>
-
+#include <cassert>
 #include <cstddef>
-#include <string>
+#include <stdexcept>
 
-#include "matrix.h"
+#include "matrix.hpp"
 
 namespace cuda_lab::matrix_multiply {
+enum class MatrixMultiplyType { kSimple = 0, kCoalesced = 1, kSharedAB = 2 };
 
-constexpr std::size_t kBlockSize{16};
-constexpr std::size_t kTileSize{16};
+constexpr std::size_t kBlockSize{32};
+constexpr std::size_t kTileSize{32};
 
-enum class MatrixMultiplyType : std::size_t {
-  kSimple = 0,
-  kCoalesced = 1,
-  kSharedAB = 2
-};
+template <typename T>
+void SimpleMatrixMultiplyKernel(cuda_lab::MatrixDevice<T> const& a,
+                                cuda_lab::MatrixDevice<T> const& b,
+                                cuda_lab::MatrixDevice<T>& c);
 
-void CheckCudaError(cudaError_t const err, char const* msg);
-void MatrixMultiply(Matrix const& a, Matrix const& b, Matrix& c,
-                    MatrixMultiplyType const type);
-void PrintMatrix(Matrix const& m, std::string const& n);
-/// @brief Compute ceiling division(rounds up when there's a remainder)
-/// @param a Numerator - the total quantity to be divided (e.g., total elements,
-/// bytes)
+template <typename T>
+inline void MatrixMultiply(
+    cuda_lab::MatrixHost<T> const& a, cuda_lab::MatrixHost<T> const& b,
+    cuda_lab::MatrixHost<T>& c,
+    MatrixMultiplyType type = MatrixMultiplyType::kSimple) {
+  assert(a.cols() == b.rows() && c.rows() == a.rows() && c.cols() == b.cols() &&
+         "Inner dimensions must match for multiplication");
+
+  cuda_lab::MatrixDevice<T> dev_a{a.to_device()};
+  cuda_lab::MatrixDevice<T> dev_b{b.to_device()};
+  cuda_lab::MatrixDevice<T> dev_c{c.to_device()};
+
+  switch (type) {
+    case MatrixMultiplyType::kSimple:
+      SimpleMatrixMultiplyKernel(dev_a, dev_b, dev_c);
+      break;
+    case MatrixMultiplyType::kCoalesced:
+      // CoalescedMatrixMultiplyKernel<T>(dev_a, dev_b, dev_c);
+      break;
+    case MatrixMultiplyType::kSharedAB:
+      // SharedABMatrixMultiplyKernel<T>(dev_a, dev_b, dev_c);
+      break;
+    default:
+      throw std::invalid_argument("Invalid MatrixMultiplyType");
+  }
+
+  c.from_device(dev_c);
+
+  cudaFree(dev_a.data);
+  cudaFree(dev_b.data);
+  cudaFree(dev_c.data);
+}
+/// @param a Numerator - the total quantity to be divided (e.g., total
+/// elements, bytes)
 /// @param b Denominator - the capacity per unit (e.g., elements per block,
 /// bytes per page)
 /// @return The minimal number of units required to contain the total quantity
@@ -35,5 +61,4 @@ __host__ __device__ inline std::size_t DivUp(std::size_t const a,
                                              std::size_t const b) {
   return (a + b - 1) / b;
 }
-// More, matrix multiply using cpu serial and cpu parallel.
 }  // namespace cuda_lab::matrix_multiply
