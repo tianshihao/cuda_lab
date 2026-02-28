@@ -45,9 +45,8 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --extended-lambda")
 
 add_definitions(-DREPO_ROOT_PATH=\"${CMAKE_SOURCE_DIR}\")
 
+enable_testing()
 add_subdirectory(src)
-
-# enable_testing()
-# add_subdirectory(test)
+add_subdirectory(test)
 
 # set(CMAKE_CXX_CLANG_TIDY "${CLANGTIDY};-extra-arg=-Wno-unknown-warning-option;-header-filter=${CMAKE_SOURCE_DIR}/src/*")
