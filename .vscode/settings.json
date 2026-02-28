@@ -1,4 +1,9 @@
 {
   "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
-  "clangd.path": "clangd-12"
+  "clangd.path": "clangd-12",
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+      "file": ".github/prompts/copilot-commit-message-instructions.md"
+    }
+  ]
 }
