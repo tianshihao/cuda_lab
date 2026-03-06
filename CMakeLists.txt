@@ -46,6 +46,8 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --extended-lambda")
 add_definitions(-DREPO_ROOT_PATH=\"${CMAKE_SOURCE_DIR}\")
 
 enable_testing()
+
+add_subdirectory(operators)
 add_subdirectory(src)
 add_subdirectory(test)
 
