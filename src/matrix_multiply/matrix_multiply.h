@@ -25,9 +25,12 @@ inline void MatrixMultiply(
   assert(a.cols() == b.rows() && c.rows() == a.rows() && c.cols() == b.cols() &&
          "Inner dimensions must match for multiplication");
 
-  cuda_lab::MatrixDevice<T> dev_a{a.to_device()};
-  cuda_lab::MatrixDevice<T> dev_b{b.to_device()};
-  cuda_lab::MatrixDevice<T> dev_c{c.to_device()};
+  a.to_device();
+  b.to_device();
+  c.to_device();
+  cuda_lab::MatrixDevice<T> dev_a = *a.device();
+  cuda_lab::MatrixDevice<T> dev_b = *b.device();
+  cuda_lab::MatrixDevice<T> dev_c = *c.device();
 
   switch (type) {
     case MatrixMultiplyType::kSimple:
@@ -40,14 +43,10 @@ inline void MatrixMultiply(
       // SharedABMatrixMultiplyKernel<T>(dev_a, dev_b, dev_c);
       break;
     default:
-      throw std::invalid_argument("Invalid MatrixMultiplyType");
+      throw std::invalid_argument("Unknown MatrixMultiplyType");
   }
 
-  c.from_device(dev_c);
-
-  cudaFree(dev_a.data);
-  cudaFree(dev_b.data);
-  cudaFree(dev_c.data);
+  c.from_device();
 }
 /// @param a Numerator - the total quantity to be divided (e.g., total
 /// elements, bytes)
