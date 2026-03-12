@@ -6,6 +6,15 @@
 namespace cuda_lab::matrix_multiply {
 
 template <typename T>
+MatrixDevice<T>* CreateMatrixDevice(const MatrixHost<T>& host_matrix) {
+  MatrixDevice<T>* device_matrix{nullptr};
+  cudaMalloc(&device_matrix, sizeof(MatrixDevice<T>));
+  cudaMemcpy(device_matrix, host_matrix.device(), sizeof(MatrixDevice<T>),
+             cudaMemcpyHostToDevice);
+  return device_matrix;
+}
+
+template <typename T>
 __global__ void simple_matrix_multipy_kernel(
     cuda_lab::MatrixDevice<T> const* const a,
     cuda_lab::MatrixDevice<T> const* const b,
@@ -26,32 +35,23 @@ __global__ void simple_matrix_multipy_kernel(
 
 // Template wrapper for kernel launch
 template <typename T>
-void SimpleMatrixMultiplyKernel(cuda_lab::MatrixDevice<T> const& a,
-                                cuda_lab::MatrixDevice<T> const& b,
-                                cuda_lab::MatrixDevice<T>& c) {
+void SimpleMatrixMultiplyKernel(cuda_lab::MatrixHost<T> const& a,
+                                cuda_lab::MatrixHost<T> const& b,
+                                cuda_lab::MatrixHost<T>& c) {
   // Allocate device memory for MatrixDevice<T> structs
-  cuda_lab::MatrixDevice<T>*d_a, *d_b, *d_c;
-  cudaMalloc(&d_a, sizeof(cuda_lab::MatrixDevice<T>));
-  cudaMalloc(&d_b, sizeof(cuda_lab::MatrixDevice<T>));
-  cudaMalloc(&d_c, sizeof(cuda_lab::MatrixDevice<T>));
-  cudaMemcpy(d_a, &a, sizeof(cuda_lab::MatrixDevice<T>),
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(d_b, &b, sizeof(cuda_lab::MatrixDevice<T>),
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(d_c, &c, sizeof(cuda_lab::MatrixDevice<T>),
-             cudaMemcpyHostToDevice);
+  auto* d_a{CreateMatrixDevice(a)};
+  auto* d_b{CreateMatrixDevice(b)};
+  auto* d_c{CreateMatrixDevice(c)};
 
   dim3 block_size(kBlockSize, kBlockSize);
-  dim3 grid_size(static_cast<unsigned int>(DivUp(c.cols, block_size.x)),
-                 static_cast<unsigned int>(DivUp(c.rows, block_size.y)));
+  dim3 grid_size(static_cast<unsigned int>(DivUp(c.cols(), block_size.x)),
+                 static_cast<unsigned int>(DivUp(c.rows(), block_size.y)));
+
   cudaDeviceSynchronize();
   simple_matrix_multipy_kernel<T><<<grid_size, block_size>>>(d_a, d_b, d_c);
   cudaDeviceSynchronize();
 
-  // Copy result struct back to host (not strictly needed unless struct fields
-  // are changed)
-  cudaMemcpy(&c, d_c, sizeof(cuda_lab::MatrixDevice<T>),
-             cudaMemcpyDeviceToHost);
+  // No need to copy struct back unless fields are changed
   cudaFree(d_a);
   cudaFree(d_b);
   cudaFree(d_c);
@@ -63,14 +63,14 @@ template __global__ void simple_matrix_multipy_kernel<float>(
     cuda_lab::MatrixDevice<float> const* const,
     cuda_lab::MatrixDevice<float>* const);
 template void SimpleMatrixMultiplyKernel<float>(
-    cuda_lab::MatrixDevice<float> const&, cuda_lab::MatrixDevice<float> const&,
-    cuda_lab::MatrixDevice<float>&);
+    cuda_lab::MatrixHost<float> const&, cuda_lab::MatrixHost<float> const&,
+    cuda_lab::MatrixHost<float>&);
 template __global__ void simple_matrix_multipy_kernel<int>(
     cuda_lab::MatrixDevice<int> const* const,
     cuda_lab::MatrixDevice<int> const* const,
     cuda_lab::MatrixDevice<int>* const);
-template void SimpleMatrixMultiplyKernel<int>(
-    cuda_lab::MatrixDevice<int> const&, cuda_lab::MatrixDevice<int> const&,
-    cuda_lab::MatrixDevice<int>&);
+template void SimpleMatrixMultiplyKernel<int>(cuda_lab::MatrixHost<int> const&,
+                                              cuda_lab::MatrixHost<int> const&,
+                                              cuda_lab::MatrixHost<int>&);
 
 }  // namespace cuda_lab::matrix_multiply
