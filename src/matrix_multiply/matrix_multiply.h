@@ -13,9 +13,9 @@ constexpr std::size_t kBlockSize{32};
 constexpr std::size_t kTileSize{32};
 
 template <typename T>
-void SimpleMatrixMultiplyKernel(cuda_lab::MatrixDevice<T> const& a,
-                                cuda_lab::MatrixDevice<T> const& b,
-                                cuda_lab::MatrixDevice<T>& c);
+void SimpleMatrixMultiplyKernel(cuda_lab::MatrixHost<T> const& a,
+                                cuda_lab::MatrixHost<T> const& b,
+                                cuda_lab::MatrixHost<T>& c);
 
 template <typename T>
 inline void MatrixMultiply(
@@ -25,28 +25,21 @@ inline void MatrixMultiply(
   assert(a.cols() == b.rows() && c.rows() == a.rows() && c.cols() == b.cols() &&
          "Inner dimensions must match for multiplication");
 
-  a.to_device();
-  b.to_device();
-  c.to_device();
-  cuda_lab::MatrixDevice<T> dev_a = *a.device();
-  cuda_lab::MatrixDevice<T> dev_b = *b.device();
-  cuda_lab::MatrixDevice<T> dev_c = *c.device();
-
   switch (type) {
     case MatrixMultiplyType::kSimple:
-      SimpleMatrixMultiplyKernel(dev_a, dev_b, dev_c);
+      SimpleMatrixMultiplyKernel(a, b, c);
       break;
     case MatrixMultiplyType::kCoalesced:
-      // CoalescedMatrixMultiplyKernel<T>(dev_a, dev_b, dev_c);
+      // CoalescedMatrixMultiplyKernel<T>(*dev_a, *dev_b, *dev_c);
       break;
     case MatrixMultiplyType::kSharedAB:
-      // SharedABMatrixMultiplyKernel<T>(dev_a, dev_b, dev_c);
+      // SharedABMatrixMultiplyKernel<T>(*dev_a, *dev_b, *dev_c);
       break;
     default:
       throw std::invalid_argument("Unknown MatrixMultiplyType");
   }
 
-  c.from_device();
+  // c.from_device();
 }
 /// @param a Numerator - the total quantity to be divided (e.g., total
 /// elements, bytes)
