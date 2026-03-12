@@ -57,27 +57,25 @@ class MatrixHost {
       throw std::out_of_range("MatrixHost::set: index out of range");
     }
     data()[row * cols_ + col] = value;
-    buffer_.mark_dirty_host();
+    // buffer_.mark_dirty_host();
   }
 
   // Get or create managed device matrix
   MatrixDevice<T>* device() const {
-    if (!device_) {
-      to_device();
-    }
-    return device_;
+    to_device();
+    return device_.get();
   }
 
   // Explicitly sync host to device and update device_ pointer
   void to_device() const {
-    buffer_.sync_to_device();
-    if (!device_) {
-      device_ = new MatrixDevice<T>{buffer_.device_ptr(), rows_, cols_};
-    } else {
-      device_->data = buffer_.device_ptr();
+    // buffer_.sync_to_device();
+    if (nullptr == device_) {
+      device_ = std::make_unique<MatrixDevice<T>>();
       device_->rows = rows_;
       device_->cols = cols_;
     }
+    buffer_.sync_to_device();
+    device_->data = buffer_.device_ptr();
   }
 
   // Explicitly sync device to host
@@ -115,10 +113,10 @@ class MatrixHost {
   }
 
  private:
-  std::size_t rows_;
-  std::size_t cols_;
-  Buffer<T, MemoryType::kHost> buffer_;
-  mutable MatrixDevice<T>* device_ = nullptr;
+  std::size_t rows_{};
+  std::size_t cols_{};
+  mutable Buffer<T, MemoryType::kHost> buffer_{};
+  mutable std::unique_ptr<MatrixDevice<T>> device_{nullptr};
 };
 
 }  // namespace cuda_lab
