@@ -24,6 +24,8 @@ int main() {
                         MatrixMultiplyType::kSimple);
   }
 
+  // mat_c_int.from_device();
+
   std::cout << "Result matrix C (int):" << std::endl;
   mat_c_int.print();
 
