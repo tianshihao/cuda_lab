@@ -15,7 +15,7 @@ function(auto_cuda_project)
 
     add_executable(${_proj_name} ${_srcs})
     target_include_directories(${_proj_name} PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
-    target_link_libraries(${_proj_name} PRIVATE CUDA::cudart)
+    target_link_libraries(${_proj_name} PRIVATE CUDA::cudart libcuda_lab_device_fill libcuda_lab_add_one)
     message(STATUS "[auto_cuda_project] Executable: ${_proj_name}")
 endfunction()
 
