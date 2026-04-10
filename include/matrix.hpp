@@ -60,6 +60,10 @@ class MatrixHost {
     // buffer_.mark_dirty_host();
   }
 
+  void fill(T const& value) {
+    std::fill_n(buffer_.host_ptr(), rows_ * cols_, value);
+  }
+
   // Get or create managed device matrix
   MatrixDevice<T>* device() const {
     to_device();
@@ -85,14 +89,15 @@ class MatrixHost {
              std::ostream& os = std::cout) const {
     auto r{rows()};
     auto c{cols()};
+    os << "Matrix: rows = " << r << ", cols = " << c << "\n";
     std::size_t hc{max_count / 2};
 
-    auto is_row_skipped = [&](std::size_t i) {
+    auto is_row_skipped{[&](std::size_t i) {
       return (r > max_count && i >= hc && i < r - hc);
-    };
-    auto is_col_skipped = [&](std::size_t j) {
+    }};
+    auto is_col_skipped{[&](std::size_t j) {
       return (c > max_count && j >= hc && j < c - hc);
-    };
+    }};
 
     for (std::size_t i = 0; i < r; ++i) {
       if (is_row_skipped(i)) {
@@ -111,6 +116,8 @@ class MatrixHost {
       os << "\n";
     }
   }
+
+  std::size_t bytes() const { return rows_ * cols_ * sizeof(T); }
 
  private:
   std::size_t rows_{};
