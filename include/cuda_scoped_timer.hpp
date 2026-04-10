@@ -3,6 +3,7 @@
 #include <cuda_runtime.h>
 
 #include <cstdio>
+#include <optional>
 #include <string>
 
 namespace cuda_lab {
@@ -36,6 +37,15 @@ class CudaScopedTimer {
   }
 
   float elapsed_ms() { return finish(); }
+
+  void reset(std::optional<std::string> const name = std::nullopt) {
+    if (name) {
+      name_ = *name;
+    }
+    finished_ = false;
+    ms_ = 0.0f;
+    cudaEventRecord(start_);
+  }
 
   void print() const { printf("%s took %.2f ms.\n", name_.c_str(), ms_); }
 
